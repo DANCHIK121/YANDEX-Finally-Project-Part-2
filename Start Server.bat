@@ -1,4 +1,4 @@
 @echo off
 cd "Server"
-go run StartServer.go DataBase.go Functions.go Json.go
+go run StartServer.go DataBase.go Functions.go Json.go Structs.go
 pause

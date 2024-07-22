@@ -7,12 +7,6 @@ import (
 	"encoding/json"
 )
 
-type JsonConstsFile struct {
-	ServerIP string `json:"server_ip"`
-	ServerPort string `json:"server_port"`
-	MaxBytesForReader int `json:"server_max_bytes"`
-}
-
 func ReadJson() JsonConstsFile {
 	var jsonConsts JsonConstsFile
 

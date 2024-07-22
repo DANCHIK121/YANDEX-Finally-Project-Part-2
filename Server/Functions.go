@@ -2,13 +2,17 @@ package main
 
 import (
 	"io"
-	"log"
 	"fmt"
+	"log"
 	"errors"
+	"context"
+	"strconv"
 	"strings"
 	"net/http"
+	"database/sql"
 	"encoding/json"
 )
+
 
 func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmarshalTypeError *json.UnmarshalTypeError, err error ) {
 	switch {
@@ -78,18 +82,50 @@ func UnificationExpression[T any](expression T, w http.ResponseWriter) string {
 	return string(jsonData)
 }
 
-func UnificationExpressionsArray(expressoinsArray []CalculationStore, w http.ResponseWriter) string {
+func GetExpressionsList(w http.ResponseWriter) []CalculationStore {
+	var result []CalculationStore
+
+	ctx := context.TODO()
+
+	db, err := sql.Open("sqlite3", "DataBase/Store.db")
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.PingContext(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	temp := ""
+	if temp, err = SelectExpression(ctx, db); err != nil {
+		panic(err)
+	}
+
+	db.Close()
+
+	separation := strings.Split(temp, ";")
+	for i := 0; i <= len(separation)-1; i++ {
+		temp, _ := DecodeExpression(separation[i], "")
+		result = append(result, temp)
+	}
+
+	return result
+}
+
+func UnificationExpressionsArray(w http.ResponseWriter) string {
 	result := "[ "
 
-	for i := 0; i <= len(expressoinsArray)-1; i++ {
-		jsonData, err := json.Marshal(&expressoinsArray[i]) // Encoding calculation requests
+	array := GetExpressionsList(w)
+	for i := 0; i <= len(array)-1; i++ {
+		jsonData, err := json.Marshal(&array[i]) // Encoding calculation requests
 
 		if err != nil {
 			log.Print(err.Error())
 			http.Error(w, http.StatusText(http.StatusInternalServerError), 500) // Marshaling error
 		}
 
-		if i == len(expressoinsArray)-1 {
+		if i == len(array)-1 {
 			result += string(jsonData)
 		} else { result += string(jsonData) + ", " }
 	}
@@ -138,4 +174,136 @@ func SearchingIdInArray(id int, array []CalculationStore) bool {
 	}
 
 	return finded
+}
+
+func SearchingTokenInJWTStore(token string, array []JWT) bool {
+	var finded bool = false
+
+	for i := 0; i <= len(array)-1; i++ {
+		if array[i].Token == token {
+			finded = true
+		}
+	}
+
+	return finded
+}
+
+func ReadRequestJson[T any] (w http.ResponseWriter, r *http.Request, content_type string) (T, error) {
+	// If the Content-Type header is present, check that it has the value
+    // application/json. Note that we parse and normalize the header to remove 
+    // any additional parameters (like charset or boundary information) and normalize
+    // it by stripping whitespace and converting to lowercase before we check the
+    // value.
+	var decodedRequest T
+
+    contentType := r.Header.Get("Content-Type")
+    if contentType != "" {
+        mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+        if mediaType != content_type {
+            msg := "Content-Type header is not application/json"
+            http.Error(w, msg, http.StatusUnsupportedMediaType)
+            return decodedRequest, errors.New(msg)
+        }
+    }
+
+    if r.Body == nil {
+        msg := "Something went wrong"
+        http.Error(w, msg, 500)
+        return decodedRequest, errors.New(msg)
+    }
+
+    // Use http.MaxBytesReader to enforce a maximum read of 1MB from the
+    // response body. A request body larger than that will now result in
+    // Decode() returning a "http: request body too large" error.
+    jsonConsts := ReadJson()
+    r.Body = http.MaxBytesReader(w, r.Body, int64(jsonConsts.MaxBytesForReader))
+
+    // Setup the decoder and call the DisallowUnknownFields() method on it.
+    // This will cause Decode() to return a "json: unknown field ..." error
+    // if it encounters any extra unexpected fields in the JSON. Strictly
+    // speaking, it returns an error for "keys which do not match any
+    // non-ignored, exported fields in the destination".
+    decoder := json.NewDecoder(r.Body)
+    decoder.DisallowUnknownFields()
+
+    err := decoder.Decode(&decodedRequest)
+    if err != nil {
+        var syntaxError *json.SyntaxError
+        var unmarshalTypeError *json.UnmarshalTypeError
+
+        ErrorSwitching(w, syntaxError, unmarshalTypeError, err)
+        return decodedRequest, errors.New(err.Error())
+    }
+
+    // Call decode again, using a pointer to an empty anonymous struct as 
+    // the destination. If the request body only contained a single JSON 
+    // object this will return an io.EOF error. So if we get anything else, 
+    // we know that there is additional data in the request body.
+	err = decoder.Decode(&struct{}{})
+	if !errors.Is(err, io.EOF) {
+        msg := "Request body must only contain a single JSON object"
+        http.Error(w, msg, http.StatusBadRequest)
+        return decodedRequest, errors.New(msg)
+    }
+
+	return decodedRequest, nil
+}
+
+func EncodeExpression(expression CalculationStore, solved_expression CalculationRequest) string {
+	var result string = ""
+
+	if (solved_expression == CalculationRequest{}) {
+		result = fmt.Sprintf("%s,%s,%s;", fmt.Sprint(expression.ID), fmt.Sprint(expression.Result), expression.Status)
+	} else {
+		result = fmt.Sprintf("%s,%s;", fmt.Sprint(solved_expression.ID), fmt.Sprint(solved_expression.Expression))
+	}
+
+	return result
+}
+
+func DecodeExpression(encodedExpression string, solvedAndEncodedExpression string) (CalculationStore, CalculationRequest) {
+	var err error
+	var resultExpression CalculationStore
+	var resultSolvedExpression CalculationRequest
+
+	if solvedAndEncodedExpression == "" {
+		if encodedExpression != "" {
+			comma_separation := strings.Split(encodedExpression, ",")
+			resultExpression.ID, err = strconv.Atoi(comma_separation[0])
+
+			if err != nil {
+				panic(err)
+			}
+
+			resultExpression.Result, err = strconv.Atoi(comma_separation[1])
+
+			if err != nil {
+				panic(err)
+			}
+
+			if comma_separation[2] == "" {comma_separation[2] = " "}
+			resultExpression.Status = comma_separation[2]
+
+			return resultExpression, CalculationRequest{}
+		} else {
+			return CalculationStore{}, CalculationRequest{}
+		}
+	} else {
+		if solvedAndEncodedExpression != "" {
+			comma_separation := strings.Split(solvedAndEncodedExpression, ",")
+			resultSolvedExpression.ID, err = strconv.Atoi(comma_separation[0])
+
+			if err != nil {
+				panic(err)
+			}
+
+			resultSolvedExpression.Expression = comma_separation[1]
+
+			return CalculationStore{}, resultSolvedExpression
+		} else {
+			return CalculationStore{}, CalculationRequest{}
+		}
+	}
+
+	return CalculationStore{}, CalculationRequest{}
 }
