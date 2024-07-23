@@ -14,7 +14,7 @@ type CalculationStore struct {
     ID         int
     Result     int
     Status     string
-	JWTToken   string
+	JWTToken   JWT
 }
 
 // Struct for getting task
@@ -27,8 +27,9 @@ type Task struct {
 
 // Struct for getting result for task
 type TaskResult struct {
-    ID     int
-    Result int
+    ID       int
+    Result   int
+    JWTToken string
 }
 
 // Struct for user registration
@@ -36,6 +37,11 @@ type User struct {
     ID       int
 	Login    string
 	Password string
+}
+
+// Struct for select past user id 
+type PastUserID struct {
+    ID       int
 }
 
 // Struct for JWT tokens

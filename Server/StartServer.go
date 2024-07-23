@@ -1,40 +1,28 @@
 package main
 
 import (
-    "io"
 	"fmt"
 	"log"
     "time"
-    "errors"
     "context"
 	"strconv"
-	"strings"
     "net/http"
     "database/sql"
-    "encoding/json"
     "github.com/golang-jwt/jwt/v5"
 )
 
 var LocalID int = 0
-var ExpressionsList []CalculationStore
-var ExpressionRequestsList []CalculationRequest
+var LocalIDForDataBase int = 0
 var JWTTokensStore []JWT
 
 func ValidateAndDecodeRequest(w http.ResponseWriter, r *http.Request) {
-    decodedRequest, err := ReadRequestJson[CalculationRequest](w, r, "application/json")
+    decodedRequest, err := ReadRequestJson[CalculationRequest](w, r, "application/json", false)
     if err != nil {
         panic(err)
     }
 
-    if SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore) {
-        if SearchingIdInArray(decodedRequest.ID, ExpressionsList) {
-            decodedRequest.ID = LocalID
-            LocalID++
-        } 
-
-        // ExpressionsList = append(ExpressionsList, decodedRequest)
-        // ExpressionRequestsList = append(ExpressionRequestsList, decodedRequest)
-
+    result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+    if result {
         ctx := context.TODO()
 
         db, err := sql.Open("sqlite3", "DataBase/Store.db")
@@ -49,7 +37,7 @@ func ValidateAndDecodeRequest(w http.ResponseWriter, r *http.Request) {
 
         encodedExpression := EncodeExpression(CalculationStore{}, decodedRequest)
 
-        if err = UpdateExpressionLine(ctx, db, encodedExpression, ""); err != nil {
+        if err = UpdateExpressionLine(ctx, db, JWTTokensStore[index].UserId, encodedExpression, ""); err != nil {
             panic(err)
         }
 
@@ -68,15 +56,16 @@ func ValidateAndDecodeRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func GettingExpressoinsList (w http.ResponseWriter, r *http.Request) {
-    decodedRequest, err := ReadRequestJson[OnlyJWTTokens](w, r, "application/json")
+    decodedRequest, err := ReadRequestJson[OnlyJWTTokens](w, r, "application/json", false)
     if err != nil {
         panic(err)
     }
 
-    if SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore) {
+    result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+    if result {
         // Sending result
         w.Header().Set("Content-Type", "application/json") // Result Type
-        message := "{\"expressions\": "+ string(UnificationExpressionsArray(w)) + " }"
+        message := "{\"expressions\": "+ string(UnificationExpressionsArray(w, JWTTokensStore[index].UserId)) + " }"
         w.Write([]byte(message))
 
         // Sending result
@@ -96,12 +85,13 @@ func GettingExpressoinsListForID (w http.ResponseWriter, r *http.Request) {
     var finded bool = false
     var neededExpressionIdIndex int
 
-    decodedRequest, err := ReadRequestJson[CalculationRequest](w, r, "application/json")
+    decodedRequest, err := ReadRequestJson[CalculationRequest](w, r, "application/json", false)
     if err != nil {
         panic(err)
     }
 
-    if SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore) {
+    searchResult, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+    if searchResult {
         // Getting request like :id?ID=2
         log.Println(r.PathValue("id"))
         neededExpressionId, err := strconv.Atoi(r.PathValue("id"))
@@ -111,7 +101,7 @@ func GettingExpressoinsListForID (w http.ResponseWriter, r *http.Request) {
             return
         }
 
-        array := GetExpressionsList(w)
+        array := GetSolvedExpressionsList(w, JWTTokensStore[index].UserId)
         for i := 0; i <= len(array)-1; i++ {
             if array[i].ID == neededExpressionId {
                 finded = true
@@ -121,7 +111,7 @@ func GettingExpressoinsListForID (w http.ResponseWriter, r *http.Request) {
 
         if !finded { http.Error(w, "There is no such expression", 404)
         } else {
-            result = UnificationExpression[CalculationStore](GetExpressionsList(w)[neededExpressionIdIndex], w)
+            result = UnificationExpression[CalculationStore](GetSolvedExpressionsList(w, JWTTokensStore[index].UserId)[neededExpressionIdIndex], w)
         }
 
         // Sending result
@@ -145,98 +135,106 @@ func GettingTask(w http.ResponseWriter, r *http.Request) {
     var task Task
 
     ct := r.Header.Get("Content-Type")
-    if ct != "" {
-        mediaType := strings.ToLower(strings.TrimSpace(strings.Split(ct, ";")[0]))
-        if mediaType != "application/json" {
-            msg := "Content-Type header is not application/json"
-            http.Error(w, msg, http.StatusUnsupportedMediaType)
-            return
-        }
-
-        if r.Body == nil {
-            msg := "Something went wrong"
-            http.Error(w, msg, 500)
-            return
-        }
-
-        jsonConsts := ReadJson()
-        r.Body = http.MaxBytesReader(w, r.Body, int64(jsonConsts.MaxBytesForReader))
-        decoder := json.NewDecoder(r.Body) // Decoder creating
-        decoder.DisallowUnknownFields()
-
-        var decodedRequest TaskResult
-
-        err := decoder.Decode(&decodedRequest)
+    if ct == "application/json" {
+        decodedRequest, err := ReadRequestJson[TaskResult](w, r, "application/json", false)
         if err != nil {
-            var syntaxError *json.SyntaxError
-            var unmarshalTypeError *json.UnmarshalTypeError
-
-            ErrorSwitching(w, syntaxError, unmarshalTypeError, err)
-            return
+            panic(err)
         }
 
-        err = decoder.Decode(&struct{}{})
-        if !errors.Is(err, io.EOF) {
-            msg := "Request body must only contain a single JSON object"
-            http.Error(w, msg, http.StatusBadRequest)
-            return
+        result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+        if result {
+            result, err := SearchingTaskResult(decodedRequest, GetSolvedExpressionsList(w, JWTTokensStore[index].UserId), w)
+
+            if err != nil {
+                msg := "Something went wrong"
+                http.Error(w, msg, 500)
+                return
+            }
+
+            ctx := context.TODO()
+
+            db, err := sql.Open("sqlite3", "DataBase/Store.db")
+            if err != nil {
+                panic(err)
+            }
+
+            err = db.PingContext(ctx)
+            if err != nil {
+                panic(err)
+            }
+
+            encodeResult := EncodeExpression(CalculationStore{ID: JWTTokensStore[index].UserId, Result: result, Status: "Complited"} , CalculationRequest{})
+
+            err = UpdateExpressionLine(ctx, db, JWTTokensStore[index].UserId, "", encodeResult)
+            if err != nil {
+                panic(err)
+            }
+
+            db.Close()
+
+            // Sending result
+            w.Write([]byte("Succesfully"))
+            
+            log.Println("\n\nSuccesfully") // Succesfuly data
+        } else {
+            // Sending result
+            w.Write([]byte("JWT token is not founded"))
+
+            log.Println("\n\nJWT token is not founded") // Succesfuly data
         }
-
-        result, index, err := SearchingTaskResult(decodedRequest, ExpressionsList, w)
-
-        if err != nil {
-            msg := "Something went wrong"
-            http.Error(w, msg, 500)
-            return
-        }
-
-        ExpressionsList[index].Result = result
-        ExpressionsList[index].Status = "Complited"
-
-        // Sending result
-        w.Write([]byte("Succesfully"))
-        
-        log.Println("\n\nSuccesfully") // Succesfuly data
     } else {
-        if len(ExpressionRequestsList) <= 0 {
-            msg := "Something went wrong"
-            http.Error(w, msg, 500)
-        } 
-
-        task.ID = ExpressionsList[len(ExpressionsList)-1].ID
-
-        decodedExpression := PostFixDecoding(ExpressionRequestsList[len(ExpressionRequestsList)-1])
-
-        number, err := strconv.Atoi(decodedExpression[0])
-        task.Arg1 = number
+        decodedRequest, err := ReadRequestJson[OnlyJWTTokens](w, r, "", true)
         if err != nil {
-            msg := "Something went wrong"
-            http.Error(w, msg, 500)
-            return
+            panic(err)
         }
-        number, err = strconv.Atoi(decodedExpression[len(decodedExpression)-1])
-        task.Arg2 = number
-        if err != nil {
-            msg := "Something went wrong"
-            http.Error(w, msg, 500)
-            return
+
+        result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+        if result {
+            if len(GetExpressionsList(w, JWTTokensStore[index].UserId)) <= 0 {
+                msg := "Something went wrong"
+                http.Error(w, msg, 500)
+            }
+
+            task.ID = GetExpressionsList(w, JWTTokensStore[index].UserId)[len(GetExpressionsList(w, JWTTokensStore[index].UserId))-1].ID
+
+            decodedExpression := PostFixDecoding(GetExpressionsList(w, JWTTokensStore[index].UserId)[len(GetExpressionsList(w, JWTTokensStore[index].UserId))-2])
+
+            number, err := strconv.Atoi(decodedExpression[0])
+            task.Arg1 = number
+            if err != nil {
+                msg := "Something went wrong"
+                http.Error(w, msg, 500)
+                return
+            }
+            number, err = strconv.Atoi(decodedExpression[len(decodedExpression)-1])
+            task.Arg2 = number
+            if err != nil {
+                msg := "Something went wrong"
+                http.Error(w, msg, 500)
+                return
+            }
+            task.Operation = decodedExpression[1]
+
+            // Sending result
+            w.Header().Set("Content-Type", "application/json") // Result Type
+            message := string(UnificationExpression[Task](task, w))
+            w.Write([]byte(message))
+
+            // Sending result
+            w.Write([]byte("\n\nSuccesfully"))
+
+            log.Println("\n\nSuccesfully") // Succesfuly data
+        } else {
+            // Sending result
+            w.Write([]byte("JWT token is not founded"))
+
+            log.Println("\n\nJWT token is not founded") // Succesfuly data
         }
-        task.Operation = decodedExpression[1]
-
-        // Sending result
-        w.Header().Set("Content-Type", "application/json") // Result Type
-        message := string(UnificationExpression[Task](task, w))
-        w.Write([]byte(message))
-
-        // Sending result
-        w.Write([]byte("Succesfully"))
-
-        log.Println("\n\nSuccesfully") // Succesfuly data
     }
 }
 
 func UserRegist(w http.ResponseWriter, r *http.Request) {
-    userRegist, err := ReadRequestJson[User](w, r, "application/json")
+    userRegist, err := ReadRequestJson[User](w, r, "application/json", false)
     if err != nil {
         panic(err)
     }
@@ -266,7 +264,7 @@ func UserRegist(w http.ResponseWriter, r *http.Request) {
 }
 
 func LoginUser(w http.ResponseWriter, r *http.Request) {
-    userLogin, err := ReadRequestJson[User](w, r, "application/json")
+    userLogin, err := ReadRequestJson[User](w, r, "application/json", false)
     if err != nil {
         panic(err)
     }
@@ -304,7 +302,27 @@ func LoginUser(w http.ResponseWriter, r *http.Request) {
 		panic(err)
 	}
 
-    newUser := JWT{UserId: userLogin.ID, Token: tokenString}
+
+    ctx = context.TODO()
+
+    db, err = sql.Open("sqlite3", "DataBase/Store.db")
+    if err != nil {
+        panic(err)
+    }
+
+    err = db.PingContext(ctx)
+    if err != nil {
+        panic(err)
+    }
+    
+    IDForDataBase, err := SelectUserForLogin(ctx, db, userLogin.Login)
+    if err != nil {
+        panic(err)
+    }
+
+    db.Close()
+
+    newUser := JWT{UserId: IDForDataBase, Token: tokenString}
     JWTTokensStore = append(JWTTokensStore, newUser)
 
     // Sending result

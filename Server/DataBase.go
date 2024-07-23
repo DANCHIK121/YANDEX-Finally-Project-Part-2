@@ -100,7 +100,7 @@ func UserLogin(ctx context.Context, db *sql.DB, user User, w http.ResponseWriter
 		}
 	}
 
-	if userFinded {
+	if !userFinded {
 		// Sending result
 		w.Write([]byte("User is not founded"))
 	}
@@ -108,14 +108,14 @@ func UserLogin(ctx context.Context, db *sql.DB, user User, w http.ResponseWriter
 	return nil
 }
 
-func UpdateExpressionLine(ctx context.Context, db *sql.DB, expression string, solved_expression string) error {
+func UpdateExpressionLine(ctx context.Context, db *sql.DB, user_id int, expression string, solved_expression string) error {
 	updateSolvedExpressionLine := fmt.Sprintf(`
-		UPDATE solved_expressions SET solved_expressions = solved_expressions || "%s";
-	`, solved_expression)
+		UPDATE expressions SET solved_expressions = solved_expressions || "%s" WHERE user_id = %s;
+	`, solved_expression, fmt.Sprint(user_id))
 
 	updateExpressionLine := fmt.Sprintf(`
-		UPDATE expressions SET expression = expression || "%s";
-	`, expression)
+		UPDATE expressions SET expression = expression || "%s" WHERE user_id = %s;
+	`, expression, fmt.Sprint(user_id))
 
 	if solved_expression == "" {
 		if _, err := db.ExecContext(ctx, updateExpressionLine); err != nil {
@@ -187,12 +187,10 @@ func SelectUsers(ctx context.Context, db *sql.DB) ([]User, error) {
 	return users, nil
 }
 
-func SelectExpression(ctx context.Context, db *sql.DB) (string, error) {
-	const (
-		searchExpression = `
-			SELECT solved_expressions FROM expressions
-		`
-	)
+func SelectSolvedExpression(ctx context.Context, db *sql.DB, user_id int) (string, error) {
+	searchExpression := fmt.Sprintf(`
+		SELECT solved_expressions FROM expressions WHERE user_id = %s
+	`, fmt.Sprint(user_id))
 
 	var expression Expression
 	rows, err := db.QueryContext(ctx, searchExpression)
@@ -209,4 +207,76 @@ func SelectExpression(ctx context.Context, db *sql.DB) (string, error) {
 	}
 
 	return expression.Expression, nil
+}
+
+func SelectExpression(ctx context.Context, db *sql.DB, user_id int) (string, error) {
+	searchExpression := fmt.Sprintf(`
+		SELECT expression FROM expressions WHERE user_id = %s
+	`, fmt.Sprint(user_id))
+
+	var expression Expression
+	rows, err := db.QueryContext(ctx, searchExpression)
+	if err != nil {
+		return "", err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		err := rows.Scan(&expression.Expression)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	return expression.Expression, nil
+}
+
+func SelectPastUserID(ctx context.Context, db *sql.DB) (int, error) {
+	const (
+		searchPastUserID = `
+			SELECT user_id FROM expressions
+		`
+	)
+
+	var users []PastUserID
+	rows, err := db.QueryContext(ctx, searchPastUserID)
+	if err != nil {
+		return -1, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		u := PastUserID{}
+		err := rows.Scan(&u.ID)
+		if err != nil {
+			return -1, err
+		}
+		users = append(users, u)
+	}
+
+	return users[len(users)-1].ID, nil
+}
+
+func SelectUserForLogin(ctx context.Context, db *sql.DB, login string) (int, error) {
+	searchPastUserID := fmt.Sprintf(`
+		SELECT id FROM users WHERE login = "%s"
+	`, login)
+
+	var users []User
+	rows, err := db.QueryContext(ctx, searchPastUserID)
+	if err != nil {
+		return -1, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		u := User{}
+		err := rows.Scan(&u.ID)
+		if err != nil {
+			return -1, err
+		}
+		users = append(users, u)
+	}
+
+	return users[len(users)-1].ID, nil
 }

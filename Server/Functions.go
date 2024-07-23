@@ -82,7 +82,38 @@ func UnificationExpression[T any](expression T, w http.ResponseWriter) string {
 	return string(jsonData)
 }
 
-func GetExpressionsList(w http.ResponseWriter) []CalculationStore {
+func GetExpressionsList(w http.ResponseWriter, user_id int) []CalculationRequest {
+	var result []CalculationRequest
+
+	ctx := context.TODO()
+
+	db, err := sql.Open("sqlite3", "DataBase/Store.db")
+	if err != nil {
+		panic(err)
+	}
+
+	err = db.PingContext(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	temp := ""
+	if temp, err = SelectExpression(ctx, db, user_id); err != nil {
+		panic(err)
+	}
+
+	db.Close()
+
+	separation := strings.Split(temp, ";")
+	for i := 0; i <= len(separation)-1; i++ {
+		_, temp := DecodeExpression("", separation[i])
+		result = append(result, temp)
+	}
+
+	return result
+}
+
+func GetSolvedExpressionsList(w http.ResponseWriter, user_id int) []CalculationStore {
 	var result []CalculationStore
 
 	ctx := context.TODO()
@@ -98,7 +129,7 @@ func GetExpressionsList(w http.ResponseWriter) []CalculationStore {
 	}
 
 	temp := ""
-	if temp, err = SelectExpression(ctx, db); err != nil {
+	if temp, err = SelectSolvedExpression(ctx, db, user_id); err != nil {
 		panic(err)
 	}
 
@@ -113,10 +144,10 @@ func GetExpressionsList(w http.ResponseWriter) []CalculationStore {
 	return result
 }
 
-func UnificationExpressionsArray(w http.ResponseWriter) string {
+func UnificationExpressionsArray(w http.ResponseWriter, user_id int) string {
 	result := "[ "
 
-	array := GetExpressionsList(w)
+	array := GetExpressionsList(w, user_id)
 	for i := 0; i <= len(array)-1; i++ {
 		jsonData, err := json.Marshal(&array[i]) // Encoding calculation requests
 
@@ -144,24 +175,22 @@ func PostFixDecoding(calculationRequest CalculationRequest) []string {
 	return decodedExpression
 }
 
-func SearchingTaskResult(taskResult TaskResult, calculationStore []CalculationStore, w http.ResponseWriter) (int, int, error) {
+func SearchingTaskResult(taskResult TaskResult, calculationStore []CalculationStore, w http.ResponseWriter) (int, error) {
 	var err error
-	var index int
 	var finded bool = false
 
 	for i := 0; i <= len(calculationStore)-1; i++ {
 		if taskResult.ID == calculationStore[i].ID {
-			index = i
 			finded = true
 		}
 	}
 
 	if !finded {
 		http.Error(w, "There is no such task", 404) // Not succesfuly data
-		return 0, 0, fmt.Errorf("error")
+		return 0, fmt.Errorf("error")
 	}
 
-	return taskResult.Result, index, err
+	return taskResult.Result, err
 }
 
 func SearchingIdInArray(id int, array []CalculationStore) bool {
@@ -176,19 +205,22 @@ func SearchingIdInArray(id int, array []CalculationStore) bool {
 	return finded
 }
 
-func SearchingTokenInJWTStore(token string, array []JWT) bool {
+func SearchingTokenInJWTStore(token string, array []JWT) (bool, int) {
+	var index int
 	var finded bool = false
 
 	for i := 0; i <= len(array)-1; i++ {
 		if array[i].Token == token {
 			finded = true
+			index = i
+			break
 		}
 	}
 
-	return finded
+	return finded, index
 }
 
-func ReadRequestJson[T any] (w http.ResponseWriter, r *http.Request, content_type string) (T, error) {
+func ReadRequestJson[T any] (w http.ResponseWriter, r *http.Request, content_type string, is_get_task bool) (T, error) {
 	// If the Content-Type header is present, check that it has the value
     // application/json. Note that we parse and normalize the header to remove 
     // any additional parameters (like charset or boundary information) and normalize
@@ -196,15 +228,17 @@ func ReadRequestJson[T any] (w http.ResponseWriter, r *http.Request, content_typ
     // value.
 	var decodedRequest T
 
-    contentType := r.Header.Get("Content-Type")
-    if contentType != "" {
-        mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
-        if mediaType != content_type {
-            msg := "Content-Type header is not application/json"
-            http.Error(w, msg, http.StatusUnsupportedMediaType)
-            return decodedRequest, errors.New(msg)
-        }
-    }
+	if is_get_task != true {
+		contentType := r.Header.Get("Content-Type")
+		if contentType != "" {
+			mediaType := strings.ToLower(strings.TrimSpace(strings.Split(contentType, ";")[0]))
+			if mediaType != content_type {
+				msg := "Content-Type header is not application/json"
+				http.Error(w, msg, http.StatusUnsupportedMediaType)
+				return decodedRequest, errors.New(msg)
+			}
+		}
+	}
 
     if r.Body == nil {
         msg := "Something went wrong"
@@ -304,6 +338,4 @@ func DecodeExpression(encodedExpression string, solvedAndEncodedExpression strin
 			return CalculationStore{}, CalculationRequest{}
 		}
 	}
-
-	return CalculationStore{}, CalculationRequest{}
 }

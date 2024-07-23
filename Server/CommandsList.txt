@@ -16,6 +16,6 @@ curl -X POST --location "localhost:8000/api/v1/register" -H "Content-Type: appli
 
 curl -X POST --location "localhost:8000/api/v1/login" -H "Content-Type: application/json" --data "{\"Login\":\"Admin 2\", \"Password\": \"12345\" }"
 
-curl -X POST --location "localhost:8000/api/v1/calculate" -H "Content-Type: application/json" --data "{\"Id\": 1, \"Expression\": \"1 - 5\", \"JWTToken\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3MjE1NTMzNTgsImlhdCI6MTcyMTU1MzA1OCwibmFtZSI6IkFkbWluIiwibmJmIjoxNzIxNTUzMTE4fQ.LiEk3sndLQO47OPl313WmbsTeMQPSdhMuvm7zexyvPg\" }"
+curl -X POST --location "localhost:8000/api/v1/calculate" -H "Content-Type: application/json" --data "{\"Id\": 1, \"Expression\": \"1 - 5\", \"JWTToken\": \"\" }"
 
-curl -X POST --location "localhost:8000/api/v1/expressions" -H "Content-Type: application/json" --data "{\"JWTToken\": \"eyJhbGciOiJIUzI1NiIcCI6IkpXVCJ9.eyJleHAiOjE3MjE1NTU4NTksImlhdCI6MTcyMTU1NTU1OSwibmFtZSI6IkFkbWluIDIiLCJuYmYiOjE3MjE1NTU2MTl9.wbRutOmLmcsGvJo8iJMcdcmdk6t_CwX0rWLcVec4dyc\" }"
+curl -X POST --location "localhost:8000/api/v1/expressions" -H "Content-Type: application/json" --data "{\"JWTToken\": \"\" }"
