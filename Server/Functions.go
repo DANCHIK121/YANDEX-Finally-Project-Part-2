@@ -14,14 +14,15 @@ import (
 )
 
 
-func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmarshalTypeError *json.UnmarshalTypeError, err error ) {
+func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmarshalTypeError *json.UnmarshalTypeError, err error, isTest bool) string {
 	switch {
 	// Catch any syntax errors in the JSON and send an error message
 	// which interpolates the location of the problem to make it
 	// easier for the client to fix.
 	case errors.As(err, &syntaxError):
 		msg := fmt.Sprintf("Request body contains badly-formed JSON (at position %d)", syntaxError.Offset)
-		http.Error(w, msg, http.StatusUnprocessableEntity)
+		if !isTest { http.Error(w, msg, http.StatusUnprocessableEntity) }
+		return msg
 
 	// In some circumstances Decode() may also return an
 	// io.ErrUnexpectedEOF error for syntax errors in the JSON. There
@@ -29,7 +30,8 @@ func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmar
 	// https://github.com/golang/go/issues/25956.
 	case errors.Is(err, io.ErrUnexpectedEOF):
 		msg := "Request body contains badly-formed JSON"
-		http.Error(w, msg, http.StatusUnprocessableEntity)
+		if !isTest { http.Error(w, msg, http.StatusUnprocessableEntity) }
+		return msg
 
 	// Catch any type errors, like trying to assign a string in the
 	// JSON request body to a int field in our Person struct. We can
@@ -37,7 +39,8 @@ func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmar
 	// message to make it easier for the client to fix.
 	case errors.As(err, &unmarshalTypeError):
 		msg := fmt.Sprintf("Request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
-		http.Error(w, msg, http.StatusUnprocessableEntity)
+		if !isTest { http.Error(w, msg, http.StatusUnprocessableEntity) }
+		return msg
 
 	// Catch the error caused by extra unexpected fields in the request
 	// body. We extract the field name from the error message and
@@ -47,26 +50,30 @@ func ErrorSwitching (w http.ResponseWriter, syntaxError *json.SyntaxError, unmar
 	case strings.HasPrefix(err.Error(), "json: unknown field "):
 		fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
 		msg := fmt.Sprintf("Request body contains unknown field %s", fieldName)
-		http.Error(w, msg, http.StatusUnprocessableEntity)
+		if !isTest { http.Error(w, msg, http.StatusUnprocessableEntity) }
+		return msg
 
 	// An io.EOF error is returned by Decode() if the request body is
 	// empty.
 	case errors.Is(err, io.EOF):
 		msg := "Request body must not be empty"
-		http.Error(w, msg, 500)
+		if !isTest { http.Error(w, msg, 500) }
+		return msg
 
 	// Catch the error caused by the request body being too large. Again
 	// there is an open issue regarding turning this into a sentinel
 	// error at https://github.com/golang/go/issues/30715.
 	case err.Error() == "http: request body too large":
 		msg := "Request body must not be larger than 1MB"
-		http.Error(w, msg, 500)
+		if !isTest { http.Error(w, msg, 500) }
+		return msg
 
 	// Otherwise default to logging the error and sending a 500 Internal
 	// Server Error response.
 	default:
 		log.Print(err.Error())
-		http.Error(w, http.StatusText(http.StatusInternalServerError), 500)
+		if !isTest { http.Error(w, http.StatusText(http.StatusInternalServerError), 500) }
+		return err.Error()
 	}
 }
 
@@ -82,7 +89,7 @@ func UnificationExpression[T any](expression T, w http.ResponseWriter) string {
 	return string(jsonData)
 }
 
-func GetExpressionsList(w http.ResponseWriter, user_id int) []CalculationRequest {
+func GetExpressionsList(user_id int) []CalculationRequest {
 	var result []CalculationRequest
 
 	ctx := context.TODO()
@@ -113,7 +120,7 @@ func GetExpressionsList(w http.ResponseWriter, user_id int) []CalculationRequest
 	return result
 }
 
-func GetSolvedExpressionsList(w http.ResponseWriter, user_id int) []CalculationStore {
+func GetSolvedExpressionsList(user_id int) []CalculationStore {
 	var result []CalculationStore
 
 	ctx := context.TODO()
@@ -147,7 +154,7 @@ func GetSolvedExpressionsList(w http.ResponseWriter, user_id int) []CalculationS
 func UnificationExpressionsArray(w http.ResponseWriter, user_id int) string {
 	result := "[ "
 
-	array := GetExpressionsList(w, user_id)
+	array := GetExpressionsList(user_id)
 	for i := 0; i <= len(array)-1; i++ {
 		jsonData, err := json.Marshal(&array[i]) // Encoding calculation requests
 
@@ -265,7 +272,7 @@ func ReadRequestJson[T any] (w http.ResponseWriter, r *http.Request, content_typ
         var syntaxError *json.SyntaxError
         var unmarshalTypeError *json.UnmarshalTypeError
 
-        ErrorSwitching(w, syntaxError, unmarshalTypeError, err)
+        ErrorSwitching(w, syntaxError, unmarshalTypeError, err, false)
         return decodedRequest, errors.New(err.Error())
     }
 

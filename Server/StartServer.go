@@ -101,7 +101,7 @@ func GettingExpressoinsListForID (w http.ResponseWriter, r *http.Request) {
             return
         }
 
-        array := GetSolvedExpressionsList(w, JWTTokensStore[index].UserId)
+        array := GetSolvedExpressionsList(JWTTokensStore[index].UserId)
         for i := 0; i <= len(array)-1; i++ {
             if array[i].ID == neededExpressionId {
                 finded = true
@@ -111,7 +111,7 @@ func GettingExpressoinsListForID (w http.ResponseWriter, r *http.Request) {
 
         if !finded { http.Error(w, "There is no such expression", 404)
         } else {
-            result = UnificationExpression[CalculationStore](GetSolvedExpressionsList(w, JWTTokensStore[index].UserId)[neededExpressionIdIndex], w)
+            result = UnificationExpression[CalculationStore](GetSolvedExpressionsList(JWTTokensStore[index].UserId)[neededExpressionIdIndex], w)
         }
 
         // Sending result
@@ -143,7 +143,7 @@ func GettingTask(w http.ResponseWriter, r *http.Request) {
 
         result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
         if result {
-            result, err := SearchingTaskResult(decodedRequest, GetSolvedExpressionsList(w, JWTTokensStore[index].UserId), w)
+            result, err := SearchingTaskResult(decodedRequest, GetSolvedExpressionsList(JWTTokensStore[index].UserId), w)
 
             if err != nil {
                 msg := "Something went wrong"
@@ -190,14 +190,14 @@ func GettingTask(w http.ResponseWriter, r *http.Request) {
 
         result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
         if result {
-            if len(GetExpressionsList(w, JWTTokensStore[index].UserId)) <= 0 {
+            if len(GetExpressionsList(JWTTokensStore[index].UserId)) <= 0 {
                 msg := "Something went wrong"
                 http.Error(w, msg, 500)
             }
 
-            task.ID = GetExpressionsList(w, JWTTokensStore[index].UserId)[len(GetExpressionsList(w, JWTTokensStore[index].UserId))-1].ID
+            task.ID = GetExpressionsList(JWTTokensStore[index].UserId)[len(GetExpressionsList(JWTTokensStore[index].UserId))-1].ID
 
-            decodedExpression := PostFixDecoding(GetExpressionsList(w, JWTTokensStore[index].UserId)[len(GetExpressionsList(w, JWTTokensStore[index].UserId))-2])
+            decodedExpression := PostFixDecoding(GetExpressionsList(JWTTokensStore[index].UserId)[len(GetExpressionsList(JWTTokensStore[index].UserId))-2])
 
             number, err := strconv.Atoi(decodedExpression[0])
             task.Arg1 = number
