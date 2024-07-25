@@ -11,20 +11,14 @@ import (
 	"encoding/json"
 )
 
-type Task struct {
-    ID             int
-    Arg1           int
-    Arg2           int
-    Operation      string
-}
-
 var mx sync.Mutex
 var TempTask Task
+var CurrentJWTToken string
 var CurrentGoRutinesCount int
 
 func GetTaskFromServer() {
 	for {
-		currentTask, err := DecodeTask()
+		currentTask, err := DecodeTask(CurrentJWTToken)
 		if errors.Is(err, io.EOF) {
 			log.Println("EOF")
 		}
@@ -35,7 +29,7 @@ func GetTaskFromServer() {
 			CurrentGoRutinesCount++
 			mx.Unlock()
 			TempTask = currentTask
-			go CalculateTaskFromServer()
+			CalculateTaskFromServer()
 		}
 	}
 }
@@ -44,7 +38,7 @@ func CalculateTaskFromServer() {
 	var err error
 	var decodedRequest Task
 
-	response := NewRequestToServer()
+	response := NewRequestToServer(CurrentJWTToken)
 
 	contentType := response.Request.Header.Get("Content-Type") // Request content type validate
     if contentType != "" {
@@ -76,19 +70,8 @@ func CalculateTaskFromServer() {
         return
     }
 
-    // Call decode again, using a pointer to an empty anonymous struct as 
-    // the destination. If the request body only contained a single JSON 
-    // object this will return an io.EOF error. So if we get anything else, 
-    // we know that there is additional data in the request body.
-	err = decoder.Decode(&struct{}{})
-	if !errors.Is(err, io.EOF) {
-        msg := "Request body must only contain a single JSON object"
-        log.Fatalln(msg)
-        return
-    }
-
 	TempTask = decodedRequest
-
+	log.Println(decodedRequest)
 	SendResultToServer(decodedRequest.ID, CalculatingResult(decodedRequest))
 }
 
@@ -98,13 +81,19 @@ func main() {
 	// COMPUTING_POWER environment variable
 	computingPowerConst := os.Getenv("COMPUTING_POWER")
 
-	mx.Lock()
-	CurrentGoRutinesCount = 0
-	mx.Unlock()
+	fmt.Print("Please enter your JWT token here: ")
+	fmt.Fscan(os.Stdin, &CurrentJWTToken)
 
-	if computingPowerConst == "" {
-		log.Fatalf("Something went wrong: \n\n %s", fmt.Errorf("COMPUTING_POWER variable is nil"))
+	if CurrentJWTToken != "" {
+
+		mx.Lock()
+		CurrentGoRutinesCount = 0
+		mx.Unlock()
+
+		if computingPowerConst == "" {
+			log.Fatalf("Something went wrong: \n\n %s", fmt.Errorf("COMPUTING_POWER variable is nil"))
+		}
+
+		GetTaskFromServer()
 	}
-
-	GetTaskFromServer()
 }

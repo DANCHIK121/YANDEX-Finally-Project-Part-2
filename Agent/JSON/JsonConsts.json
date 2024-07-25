@@ -1,0 +1,7 @@
+{
+    "computing_power": 4,
+    "time_addition_ms": 1000,
+    "time_substraction_ms": 1000,
+    "time_multiplications_ms": 1000, 
+    "time_divisions_ms": 1000
+}

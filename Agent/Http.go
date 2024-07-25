@@ -1,19 +1,15 @@
 package main
 
 import (
-	"os"
-	"log"
-	"time"
 	"bytes"
-	"strconv"
-	"net/http"
 	"encoding/json"
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
 )
-
-type TaskResult struct {
-    ID     int
-    Result int
-}
 
 func CalculatingResult(task Task) int {
 	var result int = task.Arg1
@@ -32,7 +28,7 @@ func CalculatingResult(task Task) int {
 	if (err != nil) {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
-	TIME_SUBTRACTION_MS, err := strconv.Atoi(os.Getenv("TIME_SUBTRACTION_MS"))
+	TIME_SUBTRACTION_MS, err := strconv.Atoi(os.Getenv("TIME_SUBSTRACTION_MS"))
 	if (err != nil) {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
@@ -64,9 +60,11 @@ func CalculatingResult(task Task) int {
 	return result
 }
 
-func NewRequestToServer() *http.Response {
+func NewRequestToServer(jwt_token string) *http.Response {
 	client := http.Client{}
-	request, err := http.NewRequest("POST", "http://localhost:8000/internal/task", nil)
+
+	var jsonStr = []byte(fmt.Sprintf(`{"JWTToken":"%s"}`, jwt_token))
+	request, err := http.NewRequest("POST", "http://localhost:8000/internal/task", bytes.NewBuffer(jsonStr))
 
     if err != nil {
         log.Fatal(err)
@@ -87,9 +85,8 @@ func SendResultToServer(id, result int) {
 
 	taskResult.ID = id
 	taskResult.Result = result
-	message := "{ "+ string(UnificationTaskResult(taskResult)) + " }"
-
-	log.Println(message)
+	taskResult.JWTToken = CurrentJWTToken
+	// message := fmt.Sprintf("{ "+ string(UnificationTaskResult(taskResult)) + ", \"JWTToken\": \"%s\" }", CurrentJWTToken)
 
 	jsonData, err := json.Marshal(taskResult)
 	if err != nil {

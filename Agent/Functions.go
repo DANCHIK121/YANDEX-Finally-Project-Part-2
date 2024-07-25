@@ -12,28 +12,31 @@ import (
 )
 
 func EnvironmentVariablesInit() {
+	// Read json
+	jsonConsts := ReadJson()
+
 	// Setting environment variables
 	var err error
 
-	err = os.Setenv("COMPUTING_POWER", "4")
+	err = os.Setenv("COMPUTING_POWER", fmt.Sprintf("%s", fmt.Sprint(jsonConsts.ComputingPower)))
 	if err != nil {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
 
 	// Calculating actions
-	err = os.Setenv("TIME_ADDITION_MS", "1000") // TIME_ADDITION_MS - the time of the addition operation in milliseconds
+	err = os.Setenv("TIME_ADDITION_MS", fmt.Sprintf("%s", fmt.Sprint(jsonConsts.TimeAdditionMS))) // TIME_ADDITION_MS - the time of the addition operation in milliseconds
 	if err != nil {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
-	err = os.Setenv("TIME_SUBTRACTION_MS", "1000") // TIME_SUBTRACTION_MS - the time of the subtraction operation in milliseconds
+	err = os.Setenv("TIME_SUBSTRACTION_MS", fmt.Sprintf("%s", fmt.Sprint(jsonConsts.TimeSubstrationMS))) // TIME_SUBTRACTION_MS - the time of the subtraction operation in milliseconds
 	if err != nil {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
-	err = os.Setenv("TIME_MULTIPLICATIONS_MS", "1000") // TIME_MULTIPLICATIONS_MS - the time of the multiplication operation in milliseconds
+	err = os.Setenv("TIME_MULTIPLICATIONS_MS", fmt.Sprintf("%s", fmt.Sprint(jsonConsts.TimeMultiplicationsMS))) // TIME_MULTIPLICATIONS_MS - the time of the multiplication operation in milliseconds
 	if err != nil {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
-	err = os.Setenv("TIME_DIVISIONS_MS", "1000") // TIME_DIVISIONS_MS - the time of the division operation in milliseconds
+	err = os.Setenv("TIME_DIVISIONS_MS", fmt.Sprintf("%s", fmt.Sprint(jsonConsts.TimeDivisionsMS))) // TIME_DIVISIONS_MS - the time of the division operation in milliseconds
 	if err != nil {
 		log.Fatalf("Something went wrong: \n\n %s", err)
 	}
@@ -41,7 +44,7 @@ func EnvironmentVariablesInit() {
 	log.Println("Succefuly")
 }
 
-func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.UnmarshalTypeError, err error ) {
+func ErrorSwitching(syntaxError *json.SyntaxError, unmarshalTypeError *json.UnmarshalTypeError, err error ) string {
 	switch {
 	// Catch any syntax errors in the JSON and send an error message
 	// which interpolates the location of the problem to make it
@@ -49,6 +52,7 @@ func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.Unm
 	case errors.As(err, &syntaxError):
 		msg := fmt.Sprintf("Request body contains badly-formed JSON (at position %d)", syntaxError.Offset)
 		log.Println(msg)
+		return msg
 
 	// In some circumstances Decode() may also return an
 	// io.ErrUnexpectedEOF error for syntax errors in the JSON. There
@@ -57,6 +61,7 @@ func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.Unm
 	case errors.Is(err, io.ErrUnexpectedEOF):
 		msg := "Request body contains badly-formed JSON"
 		log.Println(msg)
+		return msg
 
 	// Catch any type errors, like trying to assign a string in the
 	// JSON request body to a int field in our Person struct. We can
@@ -65,6 +70,7 @@ func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.Unm
 	case errors.As(err, &unmarshalTypeError):
 		msg := fmt.Sprintf("Request body contains an invalid value for the %q field (at position %d)", unmarshalTypeError.Field, unmarshalTypeError.Offset)
 		log.Println(msg)
+		return msg
 
 	// Catch the error caused by extra unexpected fields in the request
 	// body. We extract the field name from the error message and
@@ -75,12 +81,14 @@ func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.Unm
 		fieldName := strings.TrimPrefix(err.Error(), "json: unknown field ")
 		msg := fmt.Sprintf("Request body contains unknown field %s", fieldName)
 		log.Println(msg)
+		return msg
 
 	// An io.EOF error is returned by Decode() if the request body is
 	// empty.
 	case errors.Is(err, io.EOF):
 		msg := "Request body must not be empty"
 		log.Println(msg)
+		return msg
 
 	// Catch the error caused by the request body being too large. Again
 	// there is an open issue regarding turning this into a sentinel
@@ -88,11 +96,13 @@ func ErrorSwitching (syntaxError *json.SyntaxError, unmarshalTypeError *json.Unm
 	case err.Error() == "http: request body too large":
 		msg := "Request body must not be larger than 1MB"
 		log.Println(msg)
+		return msg
 
 	// Otherwise default to logging the error and sending a 500 Internal
 	// Server Error response.
 	default:
 		log.Print(err.Error())
+		return err.Error()
 	}
 }
 
@@ -109,11 +119,11 @@ func UnificationTaskResult(taskResult TaskResult) string {
 	return string(jsonData)
 }
 
-func DecodeTask() (Task, error) {
+func DecodeTask(jwt_token string) (Task, error) {
 	var err error
 	var result Task
 
-	response := NewRequestToServer()
+	response := NewRequestToServer(jwt_token)
 
 	contentType := response.Request.Header.Get("Content-Type") // Request content type validate
     if contentType != "" {
@@ -143,17 +153,6 @@ func DecodeTask() (Task, error) {
 
         ErrorSwitching(syntaxError, unmarshalTypeError, err)
         return Task{}, err
-    }
-
-    // Call decode again, using a pointer to an empty anonymous struct as 
-    // the destination. If the request body only contained a single JSON 
-    // object this will return an io.EOF error. So if we get anything else, 
-    // we know that there is additional data in the request body.
-	err = decoder.Decode(&struct{}{})
-	if !errors.Is(err, io.EOF) {
-        msg := "request body must only contain a single JSON object"
-        log.Println(msg)
-        return Task{}, fmt.Errorf(msg)
     }
 
 	return result, nil

@@ -19,3 +19,9 @@ curl -X POST --location "localhost:8000/api/v1/login" -H "Content-Type: applicat
 curl -X POST --location "localhost:8000/api/v1/calculate" -H "Content-Type: application/json" --data "{\"Id\": 1, \"Expression\": \"1 - 5\", \"JWTToken\": \"\" }"
 
 curl -X POST --location "localhost:8000/api/v1/expressions" -H "Content-Type: application/json" --data "{\"JWTToken\": \"\" }"
+
+curl -X POST --location "localhost:8000/api/v1/expressions/2" -H "Content-Type: application/json" --data "{\"JWTToken\": \"\" }"
+
+curl -X POST --location "localhost:8000/internal/task" --data "{\"JWTToken\": \"\" }"
+
+curl -X POST --location "localhost:8000/internal/task" -H "Content-Type: application/json"  --data "{\"Id\": 0, \"Result\": -4, \"JWTToken\": \"\" }"
