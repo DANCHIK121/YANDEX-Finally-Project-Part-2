@@ -1,10 +1,11 @@
-package main
+package Agent
 
 import (
 	"os"
 	"log"
 	"fmt"
-	pb "github.com/DANCHIK121/YANDEX-Finally-Project-Part-2/Server/proto"
+	"context"
+	pb "github.com/DANCHIK121/YANDEX-Finally-Project-Part-2/Agent/proto"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -21,4 +22,31 @@ func GRPCmain() {
 		os.Exit(1)
 	}
 	defer conn.Close()
+
+	grpcClient := pb.NewTaskServiceClient(conn)
+
+	send, err := grpcClient.SendTask(context.TODO(), &pb.TaskRequest{
+		ID: 0,
+		Arg1: 1,
+		Arg2: 3,
+		Operation: "*",
+	})
+	
+	if err != nil {
+		log.Println("failed invoking Area: ", err)
+	}
+	
+	update, err := grpcClient.UpdateTaskString(context.TODO(), &pb.TaskRequest{
+		ID: 0,
+		Arg1: 1,
+		Arg2: 3,
+		Operation: "*",
+	})
+	
+	if err != nil {
+		log.Println("failed invoking Area: ", err)
+	}
+	
+	fmt.Println("Area: ", send.Arg1)
+	fmt.Println("Perimeter: ", update.Result)
 }
