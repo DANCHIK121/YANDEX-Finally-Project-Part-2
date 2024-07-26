@@ -1,11 +1,10 @@
-module server
+module github.com/DANCHIK121/YANDEX-Finally-Project-Part-2/Server
 
 go 1.22.3
 
-require github.com/mattn/go-sqlite3 v1.14.22
-
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.1
+	github.com/mattn/go-sqlite3 v1.14.22
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
 )

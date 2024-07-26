@@ -9,7 +9,6 @@ import (
     "net/http"
     "database/sql"
     "github.com/golang-jwt/jwt/v5"
-    // pb "/proto"
 )
 
 var LocalID int = 0
@@ -142,47 +141,49 @@ func GettingTask(w http.ResponseWriter, r *http.Request) {
             panic(err)
         }
 
-        result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
-        if result {
-            result, err := SearchingTaskResult(decodedRequest, GetSolvedExpressionsList(JWTTokensStore[index].UserId), w)
+        GRPCmain(decodedRequest.JWTToken, w, decodedRequest)
 
-            if err != nil {
-                msg := "Something went wrong"
-                http.Error(w, msg, 500)
-                return
-            }
+        // result, index := SearchingTokenInJWTStore(decodedRequest.JWTToken, JWTTokensStore)
+        // if result {
+        //     result, err := SearchingTaskResult(decodedRequest, GetSolvedExpressionsList(JWTTokensStore[index].UserId), w)
 
-            ctx := context.TODO()
+        //     if err != nil {
+        //         msg := "Something went wrong"
+        //         http.Error(w, msg, 500)
+        //         return
+        //     }
 
-            db, err := sql.Open("sqlite3", "DataBase/Store.db")
-            if err != nil {
-                panic(err)
-            }
+        //     ctx := context.TODO()
 
-            err = db.PingContext(ctx)
-            if err != nil {
-                panic(err)
-            }
+        //     db, err := sql.Open("sqlite3", "DataBase/Store.db")
+        //     if err != nil {
+        //         panic(err)
+        //     }
 
-            encodeResult := EncodeExpression(CalculationStore{ID: JWTTokensStore[index].UserId, Result: result, Status: "Complited"} , CalculationRequest{})
+        //     err = db.PingContext(ctx)
+        //     if err != nil {
+        //         panic(err)
+        //     }
 
-            err = UpdateExpressionLine(ctx, db, JWTTokensStore[index].UserId, "", encodeResult)
-            if err != nil {
-                panic(err)
-            }
+        //     encodeResult := EncodeExpression(CalculationStore{ID: JWTTokensStore[index].UserId, Result: result, Status: "Complited"} , CalculationRequest{})
 
-            db.Close()
+        //     err = UpdateExpressionLine(ctx, db, JWTTokensStore[index].UserId, "", encodeResult)
+        //     if err != nil {
+        //         panic(err)
+        //     }
 
-            // Sending result
-            w.Write([]byte("Succesfully"))
+        //     db.Close()
+
+        //     // Sending result
+        //     w.Write([]byte("Succesfully"))
             
-            log.Println("\n\nSuccesfully") // Succesfuly data
-        } else {
-            // Sending result
-            w.Write([]byte("JWT token is not founded"))
+        //     log.Println("\n\nSuccesfully") // Succesfuly data
+        // } else {
+        //     // Sending result
+        //     w.Write([]byte("JWT token is not founded"))
 
-            log.Println("\n\nJWT token is not founded") // Succesfuly data
-        }
+        //     log.Println("\n\nJWT token is not founded") // Succesfuly data
+        // }
     } else {
         decodedRequest, err := ReadRequestJson[OnlyJWTTokens](w, r, "", true)
         if err != nil {

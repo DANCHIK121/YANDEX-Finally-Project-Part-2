@@ -1,10 +1,20 @@
 package main
 
 import (
+    "net/http"
     "encoding/json"
+    pb "github.com/DANCHIK121/YANDEX-Finally-Project-Part-2/Server/proto"
 )
 
 // Start server file
+
+// GRPC
+type Server struct {
+    JWTToken string
+    TaskRes TaskResult
+    pb.TaskServiceServer
+    w http.ResponseWriter
+}
 
 // Struct for request decoding
 type CalculationRequest struct {
