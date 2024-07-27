@@ -1,6 +1,6 @@
 module github.com/DANCHIK121/YANDEX-Finally-Project-Part-2/Agent
 
-go 1.22.3
+go 1.22.5
 
 require (
 	google.golang.org/grpc v1.65.0

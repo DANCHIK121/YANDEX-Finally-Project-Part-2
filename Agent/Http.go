@@ -64,7 +64,7 @@ func NewRequestToServer(jwt_token string) *http.Response {
 	client := http.Client{}
 
 	var jsonStr = []byte(fmt.Sprintf(`{"JWTToken":"%s"}`, jwt_token))
-	request, err := http.NewRequest("POST", "http://localhost:8000/internal/task", bytes.NewBuffer(jsonStr))
+	request, err := http.NewRequest("POST", "http://server:8888/internal/task", bytes.NewBuffer(jsonStr))
 
     if err != nil {
         log.Fatal(err)
@@ -95,7 +95,7 @@ func SendResultToServer(id, result int) {
 
 	body := bytes.NewReader(jsonData)
 
-	response, _ := client.Post("http://localhost:8000/internal/task", "application/json", body)
+	response, _ := client.Post("http://server:8888/internal/task", "application/json", body)
 	response.Body.Close()
 
 	mx.Lock()
