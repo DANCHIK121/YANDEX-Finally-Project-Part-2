@@ -351,8 +351,7 @@ func main() {
     CheckDataBaseTables()
 
     UseGRPC = false
-    jsonConsts := ReadJson()
-    serverLocalization := fmt.Sprintf("%s:%s", jsonConsts.ServerIP, jsonConsts.ServerPort)
+    serverLocalization := "0.0.0.0:8000"
     log.Println(serverLocalization)
 
     err := http.ListenAndServe(serverLocalization, mux)
