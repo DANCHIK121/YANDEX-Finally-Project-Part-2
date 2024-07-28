@@ -13,6 +13,8 @@ import (
 
 var mx sync.Mutex
 var TempTask Task
+var ServerIP string
+var ServerHost string
 var CurrentJWTToken string
 var CurrentGoRutinesCount int
 
@@ -29,7 +31,7 @@ func GetTaskFromServer() {
 			CurrentGoRutinesCount++
 			mx.Unlock()
 			TempTask = currentTask
-			CalculateTaskFromServer()
+			go CalculateTaskFromServer()
 		}
 	}
 }
@@ -84,7 +86,13 @@ func main() {
 	fmt.Print("Please enter your JWT token here: ")
 	fmt.Fscan(os.Stdin, &CurrentJWTToken)
 
-	if CurrentJWTToken != "" {
+	fmt.Print("Please enter server host here: ")
+	fmt.Fscan(os.Stdin, &ServerHost)
+
+	fmt.Print("Please enter server ip here: ")
+	fmt.Fscan(os.Stdin, &ServerHost)
+
+	if (CurrentJWTToken != "") && (ServerHost != "") && (ServerIP != "") {
 
 		mx.Lock()
 		CurrentGoRutinesCount = 0
