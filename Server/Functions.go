@@ -154,7 +154,7 @@ func GetSolvedExpressionsList(user_id int) []CalculationStore {
 func UnificationExpressionsArray(w http.ResponseWriter, user_id int) string {
 	result := "[ "
 
-	array := GetExpressionsList(user_id)
+	array := GetSolvedExpressionsList(user_id)
 	for i := 0; i <= len(array)-1; i++ {
 		jsonData, err := json.Marshal(&array[i]) // Encoding calculation requests
 
