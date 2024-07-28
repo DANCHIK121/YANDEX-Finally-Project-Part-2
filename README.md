@@ -1,14 +1,14 @@
 # YANDEX Finally Project
 
-Необходимая версия Golang: 1.22.3
+Необходимая версия Golang: 1.22.5 (Если вы не используете Dockerfile, а я уверен что используете!)
 
-Если вам неохота читать всё, что написал можете сразу перейти к разделу "!!!!Заключение!!!!"
+Если вам неохота читать всё, что я написал можете сразу перейти к разделу "!!!!Заключение!!!!"
 
 Ссылка для быстрого скачивания:
-https://go.dev/dl/go1.22.3.windows-amd64.msi
+https://go.dev/dl/go1.22.5.windows-amd64.msi
 
-Кстати если Вы не смогли скачать или установить необходимую версию Golang (что обязательно для корректного запуска),
-в каждой папке ("Server" и "Agent") есть по одному актуальному .exe файлу ("StartServer.exe" и "Agent.exe") для правильного запуска.
+Кстати если Вы не смогли скачать или установить необходимую версию Golang (что вообще не обязательно с Docker),
+в каждой папке ("Server" и "Agent") есть по одному актуальному .exe файлу ("StartServer.exe" и "Agent.exe") для правильного запуска без использования Docker.
 
 Для вопросов по реализации или оформлению, я оставляю вам свою почту: "baharev_da@mail.ru".
 Также оставлю Вам свой телеграмм https://t.me/Programer1515
@@ -27,9 +27,11 @@ https://go.dev/dl/go1.22.3.windows-amd64.msi
 У Вас нет задачи перед запуском проекта своими ручками их устанавливать. Все они сами настроятся для корректной работы с помощью
 функции EnvironmentVariablesInit из файла Functions.go в папке Агента. Там Вы можете сами поменять их значение.
 
+И дополняя текст выше хочу сказать, что немного не успел дописать клиентскую часть на GRPC
+
                                                                 !!!!ЗАПУСК!!!!
 
-В корне репозитория есть два .bat файла ("Start Agent.bat" и "Start Server.bat") они нужны для запуска Агента и Сервера,
+В корне репозитория есть два .bat файла ("Start Agent.bat" и "Start Server.bat") они нужны для запуска Агента и Сервера без Docker,
 также во внутренних папках есть ещё два .bat файла для сборки Агента и Сервера ("Build Server.bat" и "Build Agent.bat").
 Дальше Вы можете поработать с ними при помощи команд из файла, указанного в разделе "!!!!ВАЖНО!!!!".
 
@@ -42,19 +44,37 @@ https://go.dev/dl/go1.22.3.windows-amd64.msi
 
                                                             !!!!Пример работы!!!!
 
-Например выполнив команду из CMD:
+НОВОЕ: Запуск сервера из Docker
+В папках ("Server" и "Agent") есть по одному Dockerfile файлу, комманды чтобы сбилдить контейнер, создать сеть внутри Docker для работы
+сервера и клиента, и собственно запустить контейнер, есть в CommandsList.txt файлах.
 
-curl -X POST --location "localhost:8000/api/v1/calculate" -H "Content-Type: application/json"  --data "{\"Id\": 1, \"Expression\": \"1 - 5\" }"
+В самом начале без разницы где вы в итоге запустите модули, вам необходимо войти в мои админские аккаунты
+или зарегистрироваться с помощью комманды:
+
+curl -X POST --location "localhost:8000/api/v1/register" -H "Content-Type: application/json" --data "{\"Login\":\"<User Login>\", \"Password\": \"<User password>\" }"
+
+И для входа вы должны использовать:
+
+curl -X POST --location "localhost:8000/api/v1/login" -H "Content-Type: application/json" --data "{\"Login\":\"<User Login>\", \"Password\": \"<User password>\" }"
+
+Все пароли и логины есть в файле бызы данных.
+                                                            !!Общение с сервером!!
+Например выполнив команду из CMD:
+Мы добавим на сервер новую задачу для работы агента.
+
+curl -X POST --location "localhost:8000/api/v1/expressions" -H "Content-Type: application/json" --data "{\"JWTToken\": \"<JWT token>\" }"
+
+Если вы всё таки запустили не в Docker то вот инструкция по запуску агента. ->
 
 Дальше нужно запустить Agent.
 
 После чего мы уже можем получить результат выражения про запросив его по ID или вывести на экран все задачи.
 
 1) Для конкретного поиска по ID:
-curl -X POST --location "localhost:8000/api/v1/expressions/:id?ID=<Expression ID>"
+curl -X POST --location "localhost:8000/api/v1/expressions/<Expression ID>" -H "Content-Type: application/json" --data "{\"JWTToken\": \"<JWT token>\" }"
 
 2) Для вывода всех выражений:
-curl -X POST --location "localhost:8000/api/v1/expressions"
+curl -X POST --location "localhost:8000/api/v1/expressions" -H "Content-Type: application/json" --data "{\"JWTToken\": \"<JWT token>\" }"
 
                                                             !!!!Заключение!!!!
 
@@ -67,4 +87,4 @@ curl -X POST --location "localhost:8000/api/v1/expressions"
 
 
 
-С большим уважением Programmer (или в GitHub DANCHIK121).
+Всё также с большим уважением Programmer (или в GitHub DANCHIK121).
