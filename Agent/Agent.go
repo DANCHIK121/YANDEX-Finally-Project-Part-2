@@ -90,7 +90,7 @@ func main() {
 	fmt.Fscan(os.Stdin, &ServerHost)
 
 	fmt.Print("Please enter server ip here: ")
-	fmt.Fscan(os.Stdin, &ServerHost)
+	fmt.Fscan(os.Stdin, &ServerIP)
 
 	if (CurrentJWTToken != "") && (ServerHost != "") && (ServerIP != "") {
 
